@@ -1,0 +1,6 @@
+{
+  "name": "Robot Portfolio",
+  "description": "A high-tech, polished portfolio showcasing robot designs, codings, and engineering projects with futuristic glassmorphic UI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
