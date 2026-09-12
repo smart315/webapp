@@ -45,3 +45,16 @@ export interface Award {
   category: string;
   rank: string;
 }
+
+export interface ProfileData {
+  titlePrimary: string;
+  titleGradient: string;
+  subtitle: string;
+  introParagraph1: string;
+  introParagraph2: string;
+  quote: string;
+  heroImage: string;
+  studentName: string;
+  email: string;
+  githubUrl: string;
+}

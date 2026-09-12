@@ -1,6 +1,19 @@
-import { Project, Experience, Skill, Award } from './types';
+import { Project, Experience, Skill, Award, ProfileData } from './types';
 
 export const HERO_IMAGE = '/src/assets/images/cyber_robot_hero_1779515176831.png';
+
+export const DEFAULT_PROFILE_DATA: ProfileData = {
+  titlePrimary: 'Building Robots,',
+  titleGradient: 'doing coding',
+  subtitle: '로봇을 만들고 코딩하며 로봇과 코드를 수정하는 과정',
+  introParagraph1: '저는 로봇을 만들고 코딩하며 당면한 임베디드 문제를 기어코 해결하는 것을 즐겨합니다. 노트북 LM을 비롯한 여러 프로그래밍 및 AI 시스템을 창조적으로 활용하여 파이썬(Python)과 C++로 보다 견고한 주행 코드를 조립하는 과정에 적극적인 관심을 갖고 있습니다.',
+  introParagraph2: '처음 설계한 코드가 실패하더라도 실시간 가상 터미널 디버깅 및 하드웨어 가조립 테스트를 집요하게 거치면서, 피드백 보정값을 찾아내어 로봇 구동 신뢰도를 높이는 실전 경험을 체화하고 있습니다.',
+  quote: '"앞으로 다양한 자율 로봇 프로젝트에 끝없이 도전하며 창의성 높은 알고리즘과 하드웨어 제어로 세상을 혁신하고 싶습니다."',
+  heroImage: HERO_IMAGE,
+  studentName: 'sirus',
+  email: 'sirus@example.com',
+  githubUrl: 'https://github.com'
+};
 
 export const PROJECTS_DATA: Project[] = [
   {

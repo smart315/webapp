@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Cpu, Menu, X, Terminal } from 'lucide-react';
+import { Cpu, Menu, X, Terminal, Shield } from 'lucide-react';
 
 interface HeaderProps {
   onToggleTerminal: () => void;
   terminalOpen: boolean;
+  onOpenAdmin: () => void;
 }
 
-export default function Header({ onToggleTerminal, terminalOpen }: HeaderProps) {
+export default function Header({ onToggleTerminal, terminalOpen, onOpenAdmin }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('about');
@@ -104,7 +105,17 @@ export default function Header({ onToggleTerminal, terminalOpen }: HeaderProps) 
         </nav>
 
         {/* Extra Actions */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-3">
+          <button
+            id="admin-open-btn"
+            onClick={onOpenAdmin}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg border text-xs font-mono font-semibold transition-all duration-300 bg-gradient-to-r from-[rgba(0,219,231,0.15)] to-[rgba(0,242,255,0.25)] hover:from-[rgba(0,219,231,0.25)] hover:to-[rgba(0,242,255,0.35)] border-[#00f2ff]/60 text-[#00f2ff] hover:border-[#00f2ff] shadow-[0_0_15px_rgba(0,242,255,0.2)] hover:scale-[1.02]"
+            title="포트폴리오 내용 직접 수정하기"
+          >
+            <Shield className="w-3.5 h-3.5 animate-pulse text-[#00f2ff]" />
+            <span>ADMIN (수정)</span>
+          </button>
+
           <button
             id="terminal-toggle-btn"
             onClick={onToggleTerminal}
@@ -120,7 +131,15 @@ export default function Header({ onToggleTerminal, terminalOpen }: HeaderProps) 
         </div>
 
         {/* Mobile Menu Trigger */}
-        <div className="md:hidden flex items-center gap-3">
+        <div className="md:hidden flex items-center gap-2.5">
+          <button
+            onClick={onOpenAdmin}
+            className="px-2.5 py-1.5 rounded-lg border border-[#00f2ff]/50 bg-[#00f2ff]/10 text-[#00f2ff] font-mono text-xs flex items-center gap-1.5"
+            title="관리자 수정 모드"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>수정</span>
+          </button>
           <button
             onClick={onToggleTerminal}
             className={`p-2 rounded-lg border ${
@@ -142,7 +161,7 @@ export default function Header({ onToggleTerminal, terminalOpen }: HeaderProps) 
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-[#0f112a] border-b border-[rgba(0,219,231,0.2)] py-5 px-6 flex flex-col gap-4 animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="md:hidden absolute top-full left-0 w-full bg-[#0f112a] border-b border-[rgba(0,219,231,0.2)] py-5 px-6 flex flex-col gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
           {navItems.map((item) => (
             <a
               key={item.href}
@@ -158,6 +177,16 @@ export default function Header({ onToggleTerminal, terminalOpen }: HeaderProps) 
               {item.label}
             </a>
           ))}
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onOpenAdmin();
+            }}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-gradient-to-r from-[#00dbe7] to-[#00f2ff] text-black font-bold text-sm shadow-[0_0_15px_rgba(0,242,255,0.3)] mt-2"
+          >
+            <Shield className="w-4 h-4" />
+            <span>ADMIN 관리자 (포트폴리오 내용 수정)</span>
+          </button>
         </div>
       )}
     </header>

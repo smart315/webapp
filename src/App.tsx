@@ -1,27 +1,135 @@
-import { useState } from 'react';
-import { PROJECTS_DATA, EXPERIENCE_DATA, SKILLS_DATA, AWARDS_DATA, HERO_IMAGE } from './data';
-import { Project, Experience, Skill } from './types';
+import { useState, useEffect } from 'react';
+import { 
+  PROJECTS_DATA, EXPERIENCE_DATA, SKILLS_DATA, AWARDS_DATA, 
+  DEFAULT_PROFILE_DATA 
+} from './data';
+import { Project, Experience, Skill, Award, ProfileData } from './types';
 import Header from './components/Header';
 import ProjectModal from './components/ProjectModal';
 import RobotAssistant from './components/RobotAssistant';
 import TerminalOverlay from './components/TerminalOverlay';
+import AdminModal from './components/AdminModal';
 import { 
   Trophy, Cpu, Wrench, GraduationCap, Code2, Play, 
-  ChevronRight, Compass, Heart, Github, CheckCircle2, Award 
+  ChevronRight, Compass, Heart, Github, CheckCircle2, Award as AwardIcon,
+  Shield, Edit3, Plus, Settings
 } from 'lucide-react';
 
 export default function App() {
+  // Persistence states
+  const [profile, setProfile] = useState<ProfileData>(() => {
+    try {
+      const saved = localStorage.getItem('sirus_profile');
+      return saved ? JSON.parse(saved) : DEFAULT_PROFILE_DATA;
+    } catch {
+      return DEFAULT_PROFILE_DATA;
+    }
+  });
+
+  const [projects, setProjects] = useState<Project[]>(() => {
+    try {
+      const saved = localStorage.getItem('sirus_projects');
+      return saved ? JSON.parse(saved) : PROJECTS_DATA;
+    } catch {
+      return PROJECTS_DATA;
+    }
+  });
+
+  const [experiences, setExperiences] = useState<Experience[]>(() => {
+    try {
+      const saved = localStorage.getItem('sirus_experiences');
+      return saved ? JSON.parse(saved) : EXPERIENCE_DATA;
+    } catch {
+      return EXPERIENCE_DATA;
+    }
+  });
+
+  const [skills, setSkills] = useState<Skill[]>(() => {
+    try {
+      const saved = localStorage.getItem('sirus_skills');
+      return saved ? JSON.parse(saved) : SKILLS_DATA;
+    } catch {
+      return SKILLS_DATA;
+    }
+  });
+
+  const [awards, setAwards] = useState<Award[]>(() => {
+    try {
+      const saved = localStorage.getItem('sirus_awards');
+      return saved ? JSON.parse(saved) : AWARDS_DATA;
+    } catch {
+      return AWARDS_DATA;
+    }
+  });
+
+  // UI modal states
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [expandedExperience, setExpandedExperience] = useState<string | null>('exp1');
 
-  // Highlight or filter projects based on clicked skill
+  // Admin Modal states
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminTab, setAdminTab] = useState<'profile' | 'projects' | 'experience' | 'skills' | 'awards'>('profile');
+  const [adminTargetProjectId, setAdminTargetProjectId] = useState<string | null>(null);
+
+  // Update & Save Handlers
+  const handleUpdateProfile = (newProfile: ProfileData) => {
+    setProfile(newProfile);
+    localStorage.setItem('sirus_profile', JSON.stringify(newProfile));
+  };
+
+  const handleUpdateProjects = (newProjects: Project[]) => {
+    setProjects(newProjects);
+    localStorage.setItem('sirus_projects', JSON.stringify(newProjects));
+    // If selectedProject was updated, refresh it
+    if (selectedProject) {
+      const updated = newProjects.find(p => p.id === selectedProject.id);
+      if (updated) setSelectedProject(updated);
+    }
+  };
+
+  const handleUpdateExperiences = (newExp: Experience[]) => {
+    setExperiences(newExp);
+    localStorage.setItem('sirus_experiences', JSON.stringify(newExp));
+  };
+
+  const handleUpdateSkills = (newSkills: Skill[]) => {
+    setSkills(newSkills);
+    localStorage.setItem('sirus_skills', JSON.stringify(newSkills));
+  };
+
+  const handleUpdateAwards = (newAwards: Award[]) => {
+    setAwards(newAwards);
+    localStorage.setItem('sirus_awards', JSON.stringify(newAwards));
+  };
+
+  const handleResetToDefault = () => {
+    localStorage.removeItem('sirus_profile');
+    localStorage.removeItem('sirus_projects');
+    localStorage.removeItem('sirus_experiences');
+    localStorage.removeItem('sirus_skills');
+    localStorage.removeItem('sirus_awards');
+
+    setProfile(DEFAULT_PROFILE_DATA);
+    setProjects(PROJECTS_DATA);
+    setExperiences(EXPERIENCE_DATA);
+    setSkills(SKILLS_DATA);
+    setAwards(AWARDS_DATA);
+  };
+
+  const openAdminAtTab = (tab: 'profile' | 'projects' | 'experience' | 'skills' | 'awards', projectId?: string) => {
+    setAdminTab(tab);
+    setAdminTargetProjectId(projectId || null);
+    setAdminOpen(true);
+  };
+
+  // Filter projects by skill
   const handleSkillToggle = (skillName: string) => {
     setSelectedSkill(prev => (prev === skillName ? null : skillName));
   };
 
-  const filteredProjects = PROJECTS_DATA.filter(project => {
+  const filteredProjects = projects.filter(project => {
     if (!selectedSkill) return true;
     return project.techStack.some(tech => 
       tech.toLowerCase().includes(selectedSkill.toLowerCase()) || 
@@ -43,10 +151,11 @@ export default function App() {
         onClose={() => setTerminalOpen(false)} 
       />
 
-      {/* Navigation Header */}
+      {/* Navigation Header with Admin Button */}
       <Header 
         onToggleTerminal={() => setTerminalOpen(prev => !prev)} 
-        terminalOpen={terminalOpen} 
+        terminalOpen={terminalOpen}
+        onOpenAdmin={() => openAdminAtTab('profile')}
       />
 
       {/* Main Content Sections wrapper */}
@@ -55,46 +164,51 @@ export default function App() {
         {/* SECTION 1: ABOUT (Hero Module) */}
         <section 
           id="about" 
-          className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center pt-8 md:pt-16 scroll-mt-24"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center pt-8 md:pt-16 scroll-mt-24 relative"
         >
           {/* Bio Content Text */}
           <div className="lg:col-span-7 flex flex-col gap-6">
-            <div className="flex items-center gap-2">
-              <span className="h-[1px] w-12 bg-[#00f2ff] shadow-[0_0_8px_#00f2ff]" />
-              <span className="font-mono text-xs uppercase tracking-wider text-[#00f2ff] text-glow-cyan-soft font-semibold">
-                SYSTEM_PORTFOLIO // ROBOTICS ENGINE
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-[1px] w-12 bg-[#00f2ff] shadow-[0_0_8px_#00f2ff]" />
+                <span className="font-mono text-xs uppercase tracking-wider text-[#00f2ff] text-glow-cyan-soft font-semibold">
+                  SYSTEM_PORTFOLIO // ROBOTICS ENGINE
+                </span>
+              </div>
+
+              {/* Direct Edit Button for About */}
+              <button
+                onClick={() => openAdminAtTab('profile')}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/20 border border-[#00f2ff]/30 text-xs font-mono text-[#00f2ff] transition-all hover:scale-105"
+                title="기본 소개 문구 수정하기"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>수정</span>
+              </button>
             </div>
 
             <div className="space-y-4">
               <h1 className="font-display font-extrabold text-[44px] sm:text-[54px] lg:text-[64px] leading-[1.05] tracking-tight text-white">
-                Building Robots, <br />
+                {profile.titlePrimary} <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00dbe7] via-[#00f2ff] to-[#74f5ff] text-glow-cyan drop-shadow-[0_0_20px_rgba(0,242,255,0.25)]">
-                  doing coding
+                  {profile.titleGradient}
                 </span>
               </h1>
               <p className="font-mono text-sm text-[#b9cacb]/90 border-l-2 border-[rgba(0,219,231,0.5)] pl-3">
-                로봇을 만들고 코딩하며 로봇과 코드를 수정하는 과정
+                {profile.subtitle}
               </p>
             </div>
 
             <div className="space-y-4 font-sans text-base leading-relaxed text-[#c1c3e0]">
-              <p>
-                저는 로봇을 만들고 코딩하며 당면한 임베디드 문제를 기어코 해결하는 것을 즐겨합니다. 
-                노트북 LM을 비롯한 여러 프로그래밍 및 AI 시스템을 창조적으로 활용하여 
-                파이썬(Python)과 C++로 보다 견고한 주행 코드를 조립하는 과정에 적극적인 관심을 갖고 있습니다.
-              </p>
-              <p>
-                처음 설계한 코드가 실패하더라도 실시간 가상 터미널 디버깅 및 하드웨어 가조립 테스트를 집요하게 거치면서, 
-                피드백 보정값을 찾아내어 로봇 구동 신뢰도를 높이는 실전 경험을 체화하고 있습니다.
-              </p>
+              <p>{profile.introParagraph1}</p>
+              {profile.introParagraph2 && <p>{profile.introParagraph2}</p>}
             </div>
 
             {/* Quote banner */}
             <div className="bg-[#171932]/70 border border-[rgba(0,219,231,0.15)] rounded-xl p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#00f2ff]" />
               <p className="font-sans italic text-sm text-[#00f2ff] font-medium leading-relaxed">
-                "앞으로 다양한 자율 로봇 프로젝트에 끝없이 도전하며 창의성 높은 알고리즘과 하드웨어 제어로 세상을 혁신하고 싶습니다."
+                {profile.quote}
               </p>
             </div>
 
@@ -112,6 +226,13 @@ export default function App() {
               >
                 My Experience
               </a>
+              <button
+                onClick={() => openAdminAtTab('profile')}
+                className="px-4 py-3 rounded-xl border border-dashed border-[#00f2ff]/40 text-[#00f2ff] font-mono text-xs hover:bg-[#00f2ff]/10 transition-colors flex items-center gap-1.5"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Admin Editor</span>
+              </button>
             </div>
           </div>
 
@@ -125,7 +246,7 @@ export default function App() {
               {/* Image box spacer with absolute design frame */}
               <div className="w-full h-full rounded-xl overflow-hidden bg-[#070815] border border-[rgba(0,219,231,0.1)] relative">
                 <img
-                  src={HERO_IMAGE}
+                  src={profile.heroImage}
                   alt="Sirus Cybernetic Hero"
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
@@ -137,9 +258,18 @@ export default function App() {
                   <span>ONLINE_CORE_ACTIVE</span>
                 </div>
 
-                <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm border border-[rgba(0,219,231,0.2)] p-2.5 rounded-lg">
-                  <span className="block font-mono text-[9px] text-[#00f2ff] uppercase tracking-wider mb-0.5">TARGET COMPACT CODE</span>
-                  <span className="block font-sans font-medium text-[11px] text-white">SIRUS_AURA_PROCESSOR // REV_2.4</span>
+                <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm border border-[rgba(0,219,231,0.2)] p-2.5 rounded-lg flex items-center justify-between">
+                  <div>
+                    <span className="block font-mono text-[9px] text-[#00f2ff] uppercase tracking-wider mb-0.5">TARGET COMPACT CODE</span>
+                    <span className="block font-sans font-medium text-[11px] text-white">SIRUS_AURA_PROCESSOR // REV_2.4</span>
+                  </div>
+                  <button
+                    onClick={() => openAdminAtTab('profile')}
+                    className="p-1.5 rounded bg-[#00f2ff]/20 text-[#00f2ff] hover:bg-[#00f2ff]/40 text-xs"
+                    title="이미지 URL 변경"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -149,16 +279,25 @@ export default function App() {
         {/* SECTION 2: EXPERIENCE */}
         <section id="experience" className="scroll-mt-24">
           <div className="space-y-4 mb-10">
-            <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
-              <span className="text-[#00f2ff]">◼</span> Experience
-            </h2>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
+                <span className="text-[#00f2ff]">◼</span> Experience
+              </h2>
+              <button
+                onClick={() => openAdminAtTab('experience')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-[#00f2ff]/40 bg-[#00f2ff]/10 hover:bg-[#00f2ff]/20 text-xs font-mono text-[#00f2ff] transition-all"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>대회/경력 항목 수정</span>
+              </button>
+            </div>
             <p className="font-sans text-sm text-[#b9cacb] max-w-2xl leading-relaxed pl-4 border-l border-[rgba(0,219,231,0.25)]">
               로봇 수업과 실전 프로젝트 및 대회를 통해 축적한 하드웨어 빌딩 역량과 C언어 제어 루틴을 수집 정리했습니다.
             </p>
           </div>
 
           <div className="relative border-l border-[rgba(0,219,231,0.25)] ml-3 md:ml-6 space-y-8">
-            {EXPERIENCE_DATA.map((exp) => {
+            {experiences.map((exp) => {
               const isActive = expandedExperience === exp.id;
               return (
                 <div key={exp.id} className="relative pl-8 group">
@@ -231,16 +370,25 @@ export default function App() {
         {/* SECTION 3: SKILLS */}
         <section id="skills" className="scroll-mt-24">
           <div className="space-y-4 mb-10">
-            <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
-              <span className="text-[#00f2ff]">◼</span> Skills
-            </h2>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
+                <span className="text-[#00f2ff]">◼</span> Skills
+              </h2>
+              <button
+                onClick={() => openAdminAtTab('skills')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-[#00f2ff]/40 bg-[#00f2ff]/10 hover:bg-[#00f2ff]/20 text-xs font-mono text-[#00f2ff] transition-all"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>기술 목록 편집</span>
+              </button>
+            </div>
             <p className="font-sans text-sm text-[#b9cacb] max-w-2xl leading-relaxed pl-4 border-l border-[rgba(0,219,231,0.25)]">
               경험과 대회 준비를 통해 실전 배포 및 테스팅에 활용하는 전문 기술과 핵심 역량 칩입니다. 단추를 눌러 해당 기술이 스며든 로봇 프로젝트를 직접 필터링해보세요!
             </p>
           </div>
 
           <div className="flex flex-wrap justify-center gap-3 max-w-4xl mx-auto p-6 bg-[#171932]/40 border border-[rgba(0,219,231,0.15)] rounded-2xl glow-cyan-hover transition-all">
-            {SKILLS_DATA.map((skill) => {
+            {skills.map((skill) => {
               const isSelected = selectedSkill === skill.name;
               return (
                 <button
@@ -271,26 +419,35 @@ export default function App() {
         {/* SECTION 4: CERTIFICATIONS & AWARDS */}
         <section id="awards" className="scroll-mt-24">
           <div className="space-y-4 mb-10">
-            <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
-              <span className="text-[#00f2ff]">◼</span> Certifications & Awards
-            </h2>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
+                <span className="text-[#00f2ff]">◼</span> Certifications & Awards
+              </h2>
+              <button
+                onClick={() => openAdminAtTab('awards')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-[#00f2ff]/40 bg-[#00f2ff]/10 hover:bg-[#00f2ff]/20 text-xs font-mono text-[#00f2ff] transition-all"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>수상 내역 편집</span>
+              </button>
+            </div>
             <p className="font-sans text-sm text-[#b9cacb] max-w-2xl leading-relaxed pl-4 border-l border-[rgba(0,219,231,0.25)]">
               치열한 협업과 전압 한계를 뚫어내며 무대 위에서 이륙한 공식 영광의 트로피 보드입니다.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {AWARDS_DATA.map((award) => (
+            {awards.map((award) => (
               <div 
                 key={award.id}
                 className="group relative flex items-center gap-5 p-6 rounded-2xl bg-[#1b1d3a]/60 border border-[rgba(0,219,231,0.2)] hover:border-[#00f2ff] glow-cyan-hover transition-all duration-350"
               >
                 {/* Visual Icon Trophy with circular glow */}
                 <div className="w-14 h-14 shrink-0 rounded-xl bg-[rgba(0,219,231,0.05)] border border-[rgba(0,219,231,0.25)] flex items-center justify-center text-[#00f2ff] transition-all duration-300 group-hover:bg-[rgba(0,219,231,0.12)] group-hover:scale-105 group-hover:glow-cyan">
-                  <Award className="w-6 h-6 animate-pulse" />
+                  <AwardIcon className="w-6 h-6 animate-pulse" />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <span className="font-mono text-[9px] text-[#00f2ff] bg-[rgba(0,219,231,0.1)] px-2 py-0.5 rounded border border-[#00f2ff]/20">
                     CLASS: {award.year}
                   </span>
@@ -303,6 +460,15 @@ export default function App() {
                     <span className="text-[#00f2ff] font-semibold text-glow-cyan-soft bg-[rgba(0,219,231,0.05)] px-1.5 rounded">{award.rank}</span>
                   </p>
                 </div>
+
+                {/* Direct edit button */}
+                <button
+                  onClick={() => openAdminAtTab('awards')}
+                  className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-[#00f2ff] transition-opacity"
+                  title="수상 내역 수정"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -312,9 +478,18 @@ export default function App() {
         <section id="portfolio" className="scroll-mt-24">
           <div className="space-y-4 mb-10 pb-2 border-b border-[rgba(0,219,231,0.15)] flex justify-between items-end flex-wrap gap-4">
             <div>
-              <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
-                <span className="text-[#00f2ff]">◼</span> Portfolio
-              </h2>
+              <div className="flex items-center gap-3">
+                <h2 className="font-display font-semibold text-3xl md:text-4xl text-white tracking-widest flex items-center gap-3">
+                  <span className="text-[#00f2ff]">◼</span> Portfolio
+                </h2>
+                <button
+                  onClick={() => openAdminAtTab('projects')}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[#00f2ff]/40 bg-[#00f2ff]/10 hover:bg-[#00f2ff]/20 text-xs font-mono text-[#00f2ff] transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>새 프로젝트 추가/관리</span>
+                </button>
+              </div>
               <p className="font-sans text-sm text-[#b9cacb] max-w-2xl leading-relaxed mt-2.5">
                 완성도 높은 로봇 프로덕트와 쾌적한 펌웨어 디버깅 웹앱 결과물을 아래에서 검토하십시오.
               </p>
@@ -360,6 +535,16 @@ export default function App() {
                         </span>
                       ))}
                     </div>
+
+                    {/* Quick project edit button on card image hover */}
+                    <button
+                      onClick={() => openAdminAtTab('projects', project.id)}
+                      className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/80 border border-[#00f2ff]/40 text-[#00f2ff] opacity-0 group-hover:opacity-100 hover:scale-110 transition-all text-xs flex items-center gap-1 font-mono"
+                      title="이 프로젝트 내용 수정"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>수정</span>
+                    </button>
                   </div>
 
                   {/* Context Text Area */}
@@ -380,12 +565,21 @@ export default function App() {
                       <Cpu className="w-3.5 h-3.5 text-[#00f2ff]" />
                       HW_SPEC: AT_BUS_CORE
                     </span>
-                    <button
-                      onClick={() => setSelectedProject(project)}
-                      className="px-4 py-2 bg-transparent border border-[rgba(0,219,231,0.4)] hover:border-[#00f2ff] text-xs font-mono font-bold hover:bg-[rgba(0,219,231,0.08)] text-[#00f2ff] rounded-lg text-glow-cyan-soft transition-all"
-                    >
-                      VIEW DETAIL // INSP
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openAdminAtTab('projects', project.id)}
+                        className="px-3 py-1.5 bg-[rgba(0,219,231,0.08)] border border-[rgba(0,219,231,0.3)] hover:border-[#00f2ff] text-xs font-mono text-[#b9cacb] hover:text-[#00f2ff] rounded-lg transition-all"
+                        title="프로젝트 내용 수정"
+                      >
+                        EDIT
+                      </button>
+                      <button
+                        onClick={() => setSelectedProject(project)}
+                        className="px-4 py-2 bg-transparent border border-[rgba(0,219,231,0.4)] hover:border-[#00f2ff] text-xs font-mono font-bold hover:bg-[rgba(0,219,231,0.08)] text-[#00f2ff] rounded-lg text-glow-cyan-soft transition-all"
+                      >
+                        VIEW DETAIL // INSP
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -412,18 +606,28 @@ export default function App() {
       <footer className="w-full bg-[#07081a] border-t border-[rgba(0,219,231,0.15)] py-12 px-6 mt-32 text-xs select-none">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
-            <h4 className="font-display font-bold text-base text-glow-cyan-soft text-white">
-              My Robot Portfolio
-            </h4>
+            <div className="flex items-center justify-center md:justify-start gap-3">
+              <h4 className="font-display font-bold text-base text-glow-cyan-soft text-white">
+                My Robot Portfolio
+              </h4>
+              <button
+                onClick={() => openAdminAtTab('profile')}
+                className="text-[10px] font-mono px-2 py-0.5 rounded border border-[#00f2ff]/30 text-[#00f2ff] hover:bg-[#00f2ff]/10"
+              >
+                관리자 수정
+              </button>
+            </div>
             <p className="text-[#b9cacb]/70 font-sans tracking-tight">
               © {new Date().getFullYear()} My Robot Portfolio. All rights reserved. 
-              <span className="block mt-0.5 font-mono text-[11px] text-[#b9cacb]/55">Student: sirus • Email: sirus@example.com</span>
+              <span className="block mt-0.5 font-mono text-[11px] text-[#b9cacb]/55">
+                Student: {profile.studentName} • Email: {profile.email}
+              </span>
             </p>
           </div>
 
           <div className="flex items-center gap-6">
             <a 
-              href="https://github.com" 
+              href={profile.githubUrl} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-[#b9cacb] hover:text-[#00f2ff] font-mono transition-colors"
@@ -456,6 +660,25 @@ export default function App() {
           onClose={() => setSelectedProject(null)} 
         />
       )}
+
+      {/* Admin Editor Modal */}
+      <AdminModal
+        isOpen={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        profile={profile}
+        onUpdateProfile={handleUpdateProfile}
+        projects={projects}
+        onUpdateProjects={handleUpdateProjects}
+        experiences={experiences}
+        onUpdateExperiences={handleUpdateExperiences}
+        skills={skills}
+        onUpdateSkills={handleUpdateSkills}
+        awards={awards}
+        onUpdateAwards={handleUpdateAwards}
+        onResetToDefault={handleResetToDefault}
+        initialTab={adminTab}
+        targetProjectId={adminTargetProjectId}
+      />
 
     </div>
   );
