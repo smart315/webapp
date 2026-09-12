@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   PROJECTS_DATA, EXPERIENCE_DATA, SKILLS_DATA, AWARDS_DATA, 
   DEFAULT_PROFILE_DATA 
@@ -9,13 +9,13 @@ import ProjectModal from './components/ProjectModal';
 import RobotAssistant from './components/RobotAssistant';
 import TerminalOverlay from './components/TerminalOverlay';
 import AdminModal from './components/AdminModal';
+import { useSupabaseData } from './hooks/useSupabaseData';
 import { 
-  getSupabaseProfile, saveSupabaseProfile,
-  getSupabaseProjects, saveSupabaseProjects,
-  getSupabaseExperience, saveSupabaseExperience,
-  getSupabaseSkills, saveSupabaseSkills,
-  getSupabaseAwards, saveSupabaseAwards,
-  subscribeToSupabaseRealtime
+  saveSupabaseProfile,
+  saveSupabaseProjects,
+  saveSupabaseExperience,
+  saveSupabaseSkills,
+  saveSupabaseAwards,
 } from './lib/supabase';
 import { 
   Trophy, Cpu, Wrench, GraduationCap, Code2, Play, 
@@ -24,100 +24,24 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  // Persistence states
-  const [profile, setProfile] = useState<ProfileData>(() => {
-    try {
-      const saved = localStorage.getItem('sirus_profile');
-      return saved ? JSON.parse(saved) : DEFAULT_PROFILE_DATA;
-    } catch {
-      return DEFAULT_PROFILE_DATA;
-    }
-  });
-
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const saved = localStorage.getItem('sirus_projects');
-      return saved ? JSON.parse(saved) : PROJECTS_DATA;
-    } catch {
-      return PROJECTS_DATA;
-    }
-  });
-
-  const [experiences, setExperiences] = useState<Experience[]>(() => {
-    try {
-      const saved = localStorage.getItem('sirus_experiences');
-      return saved ? JSON.parse(saved) : EXPERIENCE_DATA;
-    } catch {
-      return EXPERIENCE_DATA;
-    }
-  });
-
-  const [skills, setSkills] = useState<Skill[]>(() => {
-    try {
-      const saved = localStorage.getItem('sirus_skills');
-      return saved ? JSON.parse(saved) : SKILLS_DATA;
-    } catch {
-      return SKILLS_DATA;
-    }
-  });
-
-  const [awards, setAwards] = useState<Award[]>(() => {
-    try {
-      const saved = localStorage.getItem('sirus_awards');
-      return saved ? JSON.parse(saved) : AWARDS_DATA;
-    } catch {
-      return AWARDS_DATA;
-    }
-  });
-
-  // Fetch initial data from Supabase & Subscribe to Realtime postgres_changes
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadRemoteData = async () => {
-      try {
-        const [remoteProfile, remoteProjects, remoteExp, remoteSkills, remoteAwards] = await Promise.all([
-          getSupabaseProfile(),
-          getSupabaseProjects(),
-          getSupabaseExperience(),
-          getSupabaseSkills(),
-          getSupabaseAwards(),
-        ]);
-
-        if (!isMounted) return;
-        if (remoteProfile) setProfile(remoteProfile);
-        if (remoteProjects && remoteProjects.length > 0) setProjects(remoteProjects);
-        if (remoteExp && remoteExp.length > 0) setExperiences(remoteExp);
-        if (remoteSkills && remoteSkills.length > 0) setSkills(remoteSkills);
-        if (remoteAwards && remoteAwards.length > 0) setAwards(remoteAwards);
-      } catch (err) {
-        console.warn('[Supabase Realtime Sync]: Using local data fallback:', err);
-      }
-    };
-
-    loadRemoteData();
-
-    // Replaces Firestore onSnapshot with Supabase Realtime channel
-    const unsubscribe = subscribeToSupabaseRealtime((tableName) => {
-      console.log(`[Supabase Realtime] Syncing ${tableName} from PostgreSQL...`);
-      if (tableName === 'portfolio_profile') {
-        getSupabaseProfile().then(p => isMounted && setProfile(p));
-      } else if (tableName === 'portfolio_projects') {
-        getSupabaseProjects().then(p => isMounted && setProjects(p));
-      } else if (tableName === 'portfolio_experience') {
-        getSupabaseExperience().then(e => isMounted && setExperiences(e));
-      } else if (tableName === 'portfolio_skills') {
-        getSupabaseSkills().then(s => isMounted && setSkills(s));
-      } else if (tableName === 'portfolio_awards') {
-        getSupabaseAwards().then(a => isMounted && setAwards(a));
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, []);
+  // Real-time synchronization for 5 tables (site_content, experiences, skills, certifications, portfolio_items)
+  const {
+    profile,
+    projects,
+    experiences,
+    skills,
+    awards,
+    setProfile,
+    setProjects,
+    setExperiences,
+    setSkills,
+    setAwards,
+    handleUpdateProfile,
+    handleUpdateProjects,
+    handleUpdateExperiences,
+    handleUpdateSkills,
+    handleUpdateAwards,
+  } = useSupabaseData();
 
   // UI modal states
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -129,41 +53,6 @@ export default function App() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminTab, setAdminTab] = useState<'profile' | 'projects' | 'experience' | 'skills' | 'awards'>('profile');
   const [adminTargetProjectId, setAdminTargetProjectId] = useState<string | null>(null);
-
-  // Update & Save Handlers (Local + Supabase PostgreSQL sync)
-  const handleUpdateProfile = (newProfile: ProfileData) => {
-    setProfile(newProfile);
-    localStorage.setItem('sirus_profile', JSON.stringify(newProfile));
-    saveSupabaseProfile(newProfile).catch(err => console.warn('[Supabase save profile error]:', err));
-  };
-
-  const handleUpdateProjects = (newProjects: Project[]) => {
-    setProjects(newProjects);
-    localStorage.setItem('sirus_projects', JSON.stringify(newProjects));
-    saveSupabaseProjects(newProjects).catch(err => console.warn('[Supabase save projects error]:', err));
-    if (selectedProject) {
-      const updated = newProjects.find(p => p.id === selectedProject.id);
-      if (updated) setSelectedProject(updated);
-    }
-  };
-
-  const handleUpdateExperiences = (newExp: Experience[]) => {
-    setExperiences(newExp);
-    localStorage.setItem('sirus_experiences', JSON.stringify(newExp));
-    saveSupabaseExperience(newExp).catch(err => console.warn('[Supabase save experience error]:', err));
-  };
-
-  const handleUpdateSkills = (newSkills: Skill[]) => {
-    setSkills(newSkills);
-    localStorage.setItem('sirus_skills', JSON.stringify(newSkills));
-    saveSupabaseSkills(newSkills).catch(err => console.warn('[Supabase save skills error]:', err));
-  };
-
-  const handleUpdateAwards = (newAwards: Award[]) => {
-    setAwards(newAwards);
-    localStorage.setItem('sirus_awards', JSON.stringify(newAwards));
-    saveSupabaseAwards(newAwards).catch(err => console.warn('[Supabase save awards error]:', err));
-  };
 
   const handleResetToDefault = () => {
     localStorage.removeItem('sirus_profile');
