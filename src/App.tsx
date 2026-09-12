@@ -10,6 +10,14 @@ import RobotAssistant from './components/RobotAssistant';
 import TerminalOverlay from './components/TerminalOverlay';
 import AdminModal from './components/AdminModal';
 import { 
+  getSupabaseProfile, saveSupabaseProfile,
+  getSupabaseProjects, saveSupabaseProjects,
+  getSupabaseExperience, saveSupabaseExperience,
+  getSupabaseSkills, saveSupabaseSkills,
+  getSupabaseAwards, saveSupabaseAwards,
+  subscribeToSupabaseRealtime
+} from './lib/supabase';
+import { 
   Trophy, Cpu, Wrench, GraduationCap, Code2, Play, 
   ChevronRight, Compass, Heart, Github, CheckCircle2, Award as AwardIcon,
   Shield, Edit3, Plus, Settings
@@ -62,6 +70,55 @@ export default function App() {
     }
   });
 
+  // Fetch initial data from Supabase & Subscribe to Realtime postgres_changes
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRemoteData = async () => {
+      try {
+        const [remoteProfile, remoteProjects, remoteExp, remoteSkills, remoteAwards] = await Promise.all([
+          getSupabaseProfile(),
+          getSupabaseProjects(),
+          getSupabaseExperience(),
+          getSupabaseSkills(),
+          getSupabaseAwards(),
+        ]);
+
+        if (!isMounted) return;
+        if (remoteProfile) setProfile(remoteProfile);
+        if (remoteProjects && remoteProjects.length > 0) setProjects(remoteProjects);
+        if (remoteExp && remoteExp.length > 0) setExperiences(remoteExp);
+        if (remoteSkills && remoteSkills.length > 0) setSkills(remoteSkills);
+        if (remoteAwards && remoteAwards.length > 0) setAwards(remoteAwards);
+      } catch (err) {
+        console.warn('[Supabase Realtime Sync]: Using local data fallback:', err);
+      }
+    };
+
+    loadRemoteData();
+
+    // Replaces Firestore onSnapshot with Supabase Realtime channel
+    const unsubscribe = subscribeToSupabaseRealtime((tableName) => {
+      console.log(`[Supabase Realtime] Syncing ${tableName} from PostgreSQL...`);
+      if (tableName === 'portfolio_profile') {
+        getSupabaseProfile().then(p => isMounted && setProfile(p));
+      } else if (tableName === 'portfolio_projects') {
+        getSupabaseProjects().then(p => isMounted && setProjects(p));
+      } else if (tableName === 'portfolio_experience') {
+        getSupabaseExperience().then(e => isMounted && setExperiences(e));
+      } else if (tableName === 'portfolio_skills') {
+        getSupabaseSkills().then(s => isMounted && setSkills(s));
+      } else if (tableName === 'portfolio_awards') {
+        getSupabaseAwards().then(a => isMounted && setAwards(a));
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
   // UI modal states
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
@@ -73,16 +130,17 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<'profile' | 'projects' | 'experience' | 'skills' | 'awards'>('profile');
   const [adminTargetProjectId, setAdminTargetProjectId] = useState<string | null>(null);
 
-  // Update & Save Handlers
+  // Update & Save Handlers (Local + Supabase PostgreSQL sync)
   const handleUpdateProfile = (newProfile: ProfileData) => {
     setProfile(newProfile);
     localStorage.setItem('sirus_profile', JSON.stringify(newProfile));
+    saveSupabaseProfile(newProfile).catch(err => console.warn('[Supabase save profile error]:', err));
   };
 
   const handleUpdateProjects = (newProjects: Project[]) => {
     setProjects(newProjects);
     localStorage.setItem('sirus_projects', JSON.stringify(newProjects));
-    // If selectedProject was updated, refresh it
+    saveSupabaseProjects(newProjects).catch(err => console.warn('[Supabase save projects error]:', err));
     if (selectedProject) {
       const updated = newProjects.find(p => p.id === selectedProject.id);
       if (updated) setSelectedProject(updated);
@@ -92,16 +150,19 @@ export default function App() {
   const handleUpdateExperiences = (newExp: Experience[]) => {
     setExperiences(newExp);
     localStorage.setItem('sirus_experiences', JSON.stringify(newExp));
+    saveSupabaseExperience(newExp).catch(err => console.warn('[Supabase save experience error]:', err));
   };
 
   const handleUpdateSkills = (newSkills: Skill[]) => {
     setSkills(newSkills);
     localStorage.setItem('sirus_skills', JSON.stringify(newSkills));
+    saveSupabaseSkills(newSkills).catch(err => console.warn('[Supabase save skills error]:', err));
   };
 
   const handleUpdateAwards = (newAwards: Award[]) => {
     setAwards(newAwards);
     localStorage.setItem('sirus_awards', JSON.stringify(newAwards));
+    saveSupabaseAwards(newAwards).catch(err => console.warn('[Supabase save awards error]:', err));
   };
 
   const handleResetToDefault = () => {
@@ -116,6 +177,12 @@ export default function App() {
     setExperiences(EXPERIENCE_DATA);
     setSkills(SKILLS_DATA);
     setAwards(AWARDS_DATA);
+
+    saveSupabaseProfile(DEFAULT_PROFILE_DATA).catch(() => {});
+    saveSupabaseProjects(PROJECTS_DATA).catch(() => {});
+    saveSupabaseExperience(EXPERIENCE_DATA).catch(() => {});
+    saveSupabaseSkills(SKILLS_DATA).catch(() => {});
+    saveSupabaseAwards(AWARDS_DATA).catch(() => {});
   };
 
   const openAdminAtTab = (tab: 'profile' | 'projects' | 'experience' | 'skills' | 'awards', projectId?: string) => {

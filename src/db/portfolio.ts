@@ -109,6 +109,7 @@ export async function getFullPortfolio() {
           hardwareSpec: hardwareBom,
           softwareDetails: '정공법 기반 오차 실시간 가중치 매핑 및 안정 제어 루틴.',
           codeSnippet: p.sampleCode || '',
+          simulateLogs: PROJECTS_DATA.find(item => item.id === p.id)?.simulateLogs || [],
         };
       });
     }
@@ -158,7 +159,7 @@ export async function getFullPortfolio() {
         await db.insert(portfolioSkills).values({
           name: s.name,
           category: s.category,
-          level: s.level,
+          level: s.proficiency,
           orderIndex: i,
         });
       }
@@ -167,7 +168,7 @@ export async function getFullPortfolio() {
       skillsData = dbSkills.map(s => ({
         name: s.name,
         category: s.category as any,
-        level: s.level,
+        proficiency: s.level,
       }));
     }
 
@@ -306,7 +307,7 @@ export async function saveSkills(skills: Skill[]) {
       await db.insert(portfolioSkills).values({
         name: s.name,
         category: s.category,
-        level: s.level,
+        level: s.proficiency,
         orderIndex: i,
       });
     }

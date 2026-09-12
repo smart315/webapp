@@ -3,14 +3,19 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { 
-  getFullPortfolio, 
-  saveProfile, 
-  saveProjects, 
-  saveExperience, 
-  saveSkills, 
-  saveAwards, 
-  resetAllToDefaults 
-} from "./src/db/portfolio.ts";
+  getSupabaseProfile, 
+  saveSupabaseProfile, 
+  getSupabaseProjects, 
+  saveSupabaseProjects, 
+  getSupabaseExperience, 
+  saveSupabaseExperience, 
+  getSupabaseSkills, 
+  saveSupabaseSkills, 
+  getSupabaseAwards, 
+  saveSupabaseAwards,
+  supabase
+} from "./src/lib/supabase.ts";
+import { DEFAULT_PROFILE_DATA, PROJECTS_DATA, EXPERIENCE_DATA, SKILLS_DATA, AWARDS_DATA } from "./src/data.ts";
 
 dotenv.config();
 
@@ -22,9 +27,13 @@ async function startServer() {
 
   app.use(express.json({ limit: "10mb" }));
 
-  // API Routes
+  // API Health Check
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", db: "cloud_sql_postgres" });
+    res.json({ 
+      status: "ok", 
+      provider: "supabase_postgresql",
+      supabaseUrl: process.env.SUPABASE_URL || "https://hpqbkuufgsuyqleohdwl.supabase.co"
+    });
   });
 
   // Verify Admin Password
@@ -45,22 +54,41 @@ async function startServer() {
     return res.status(401).json({ error: "Unauthorized: Invalid admin password" });
   };
 
-  // Get full portfolio from database
+  // Get full portfolio from Supabase (with fallback)
   app.get("/api/portfolio", async (_req, res) => {
     try {
-      const data = await getFullPortfolio();
-      res.json(data);
+      const [profile, projects, experience, skills, awards] = await Promise.all([
+        getSupabaseProfile(),
+        getSupabaseProjects(),
+        getSupabaseExperience(),
+        getSupabaseSkills(),
+        getSupabaseAwards(),
+      ]);
+
+      res.json({
+        profile: profile || DEFAULT_PROFILE_DATA,
+        projects: projects || PROJECTS_DATA,
+        experience: experience || EXPERIENCE_DATA,
+        skills: skills || SKILLS_DATA,
+        awards: awards || AWARDS_DATA,
+      });
     } catch (error: any) {
-      console.error("Failed to retrieve portfolio data:", error);
-      res.status(500).json({ error: error.message || "Database query failed" });
+      console.error("Failed to retrieve portfolio data from Supabase:", error);
+      res.json({
+        profile: DEFAULT_PROFILE_DATA,
+        projects: PROJECTS_DATA,
+        experience: EXPERIENCE_DATA,
+        skills: SKILLS_DATA,
+        awards: AWARDS_DATA,
+      });
     }
   });
 
   // Save profile
   app.put("/api/portfolio/profile", checkAdminAuth, async (req, res) => {
     try {
-      const result = await saveProfile(req.body);
-      res.json(result);
+      await saveSupabaseProfile(req.body);
+      res.json(req.body);
     } catch (error: any) {
       console.error("Failed to save profile:", error);
       res.status(500).json({ error: error.message || "Database update failed" });
@@ -70,8 +98,8 @@ async function startServer() {
   // Save projects
   app.put("/api/portfolio/projects", checkAdminAuth, async (req, res) => {
     try {
-      const result = await saveProjects(req.body);
-      res.json(result);
+      await saveSupabaseProjects(req.body);
+      res.json(req.body);
     } catch (error: any) {
       console.error("Failed to save projects:", error);
       res.status(500).json({ error: error.message || "Database update failed" });
@@ -81,8 +109,8 @@ async function startServer() {
   // Save experience
   app.put("/api/portfolio/experience", checkAdminAuth, async (req, res) => {
     try {
-      const result = await saveExperience(req.body);
-      res.json(result);
+      await saveSupabaseExperience(req.body);
+      res.json(req.body);
     } catch (error: any) {
       console.error("Failed to save experience:", error);
       res.status(500).json({ error: error.message || "Database update failed" });
@@ -92,8 +120,8 @@ async function startServer() {
   // Save skills
   app.put("/api/portfolio/skills", checkAdminAuth, async (req, res) => {
     try {
-      const result = await saveSkills(req.body);
-      res.json(result);
+      await saveSupabaseSkills(req.body);
+      res.json(req.body);
     } catch (error: any) {
       console.error("Failed to save skills:", error);
       res.status(500).json({ error: error.message || "Database update failed" });
@@ -103,8 +131,8 @@ async function startServer() {
   // Save awards
   app.put("/api/portfolio/awards", checkAdminAuth, async (req, res) => {
     try {
-      const result = await saveAwards(req.body);
-      res.json(result);
+      await saveSupabaseAwards(req.body);
+      res.json(req.body);
     } catch (error: any) {
       console.error("Failed to save awards:", error);
       res.status(500).json({ error: error.message || "Database update failed" });
@@ -114,8 +142,20 @@ async function startServer() {
   // Reset to default
   app.post("/api/portfolio/reset", checkAdminAuth, async (_req, res) => {
     try {
-      const result = await resetAllToDefaults();
-      res.json(result);
+      await Promise.all([
+        saveSupabaseProfile(DEFAULT_PROFILE_DATA),
+        saveSupabaseProjects(PROJECTS_DATA),
+        saveSupabaseExperience(EXPERIENCE_DATA),
+        saveSupabaseSkills(SKILLS_DATA),
+        saveSupabaseAwards(AWARDS_DATA),
+      ]);
+      res.json({
+        profile: DEFAULT_PROFILE_DATA,
+        projects: PROJECTS_DATA,
+        experience: EXPERIENCE_DATA,
+        skills: SKILLS_DATA,
+        awards: AWARDS_DATA,
+      });
     } catch (error: any) {
       console.error("Failed to reset portfolio:", error);
       res.status(500).json({ error: error.message || "Database reset failed" });

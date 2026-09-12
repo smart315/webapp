@@ -461,6 +461,10 @@ export default function AdminModal({
                 <span className="px-2 py-0.5 rounded bg-cyan-950/80 border border-[#00f2ff]/30 font-mono text-[10px] text-[#00f2ff]">
                   ADMIN_MODE
                 </span>
+                <span className="px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 font-mono text-[10px] text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  SUPABASE_REALTIME
+                </span>
               </div>
               <p className="text-xs text-[#b9cacb]">
                 소개글, 프로젝트, 사진 링크, 수상 내역, 기술 스택을 자유롭게 수정하고 실시간으로 저장하세요.
